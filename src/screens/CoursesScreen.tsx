@@ -8,10 +8,10 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { getCourses, getCourseContent, getUserCourseProgress, startCourse, updateCourseProgress, getAllUserProgress } from '../services/courseService';
 import { getCurrentUser } from '../services/userService';
 import { Course, CourseContent, UserCourseProgress } from '../types/database';
-import { supabase } from '../config/supabase';
 
 export default function CoursesScreen() {
   const [loading, setLoading] = useState(true);
@@ -20,6 +20,7 @@ export default function CoursesScreen() {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [courseContent, setCourseContent] = useState<CourseContent[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all');
 
   useEffect(() => {
     loadCourses();
@@ -81,17 +82,15 @@ export default function CoursesScreen() {
     }
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'beginner':
-        return '#10B981';
-      case 'intermediate':
-        return '#F59E0B';
-      case 'advanced':
-        return '#EF4444';
-      default:
-        return '#6B7280';
-    }
+  const getCourseGradient = (index: number) => {
+    const gradients = [
+      ['#EC4899', '#DB2777'],
+      ['#8B5CF6', '#7C3AED'],
+      ['#06B6D4', '#0891B2'],
+      ['#F59E0B', '#D97706'],
+      ['#10B981', '#059669'],
+    ];
+    return gradients[index % gradients.length];
   };
 
   const getDifficultyLabel = (difficulty: string) => {
@@ -107,52 +106,130 @@ export default function CoursesScreen() {
     }
   };
 
+  const getCourseIcon = (index: number) => {
+    const icons = ['📷', '🎬', '✂️', '🎨', '📹'];
+    return icons[index % icons.length];
+  };
+
+  const getFilteredCourses = () => {
+    if (activeFilter === 'all') return courses;
+    return courses.filter(c => c.difficulty === activeFilter);
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size={48} color="#4F46E5" />
+        <ActivityIndicator size={48} color="#5B52FF" />
       </View>
     );
   }
 
+  const filteredCourses = getFilteredCourses();
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Cours & Formation</Text>
-        <Text style={styles.headerSubtitle}>Développez vos compétences audiovisuelles</Text>
+      <LinearGradient
+        colors={['#5B52FF', '#7C3AED']}
+        style={styles.header}
+      >
+        <Text style={styles.headerTitle}>Modules de Formation</Text>
+        <Text style={styles.headerSubtitle}>
+          Explore nos modules de formation créative et développe{'\n'}tes compétences en photographie, vidéo et montage.
+        </Text>
+      </LinearGradient>
+
+      <View style={styles.filterContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <TouchableOpacity
+            style={[styles.filterButton, activeFilter === 'all' && styles.filterButtonActive]}
+            onPress={() => setActiveFilter('all')}
+          >
+            <Text style={[styles.filterText, activeFilter === 'all' && styles.filterTextActive]}>
+              Tous
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterButton, activeFilter === 'beginner' && styles.filterButtonActive]}
+            onPress={() => setActiveFilter('beginner')}
+          >
+            <Text style={[styles.filterText, activeFilter === 'beginner' && styles.filterTextActive]}>
+              Débutant
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterButton, activeFilter === 'intermediate' && styles.filterButtonActive]}
+            onPress={() => setActiveFilter('intermediate')}
+          >
+            <Text style={[styles.filterText, activeFilter === 'intermediate' && styles.filterTextActive]}>
+              Intermédiaire
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterButton, activeFilter === 'advanced' && styles.filterButtonActive]}
+            onPress={() => setActiveFilter('advanced')}
+          >
+            <Text style={[styles.filterText, activeFilter === 'advanced' && styles.filterTextActive]}>
+              Avancé
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
       <ScrollView style={styles.content}>
-        {courses.map((course) => {
+        {filteredCourses.map((course, index) => {
           const progress = userProgress.get(course.id);
-          const isStarted = !!progress;
           const isCompleted = progress?.progress_percentage === 100;
+          const gradient = getCourseGradient(index);
 
           return (
             <TouchableOpacity
               key={course.id}
-              style={styles.courseCard}
               onPress={() => openCourse(course)}
+              activeOpacity={0.9}
             >
-              <View style={styles.courseHeader}>
+              <LinearGradient
+                colors={gradient}
+                style={styles.courseCard}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.courseHeader}>
+                  <View style={styles.iconContainer}>
+                    <Text style={styles.icon}>{getCourseIcon(index)}</Text>
+                  </View>
+                  <View style={styles.difficultyBadge}>
+                    <Text style={styles.difficultyText}>{getDifficultyLabel(course.difficulty)}</Text>
+                  </View>
+                </View>
+
                 <Text style={styles.courseTitle}>{course.title}</Text>
-                {isCompleted && <Text style={styles.completedBadge}>✓</Text>}
-              </View>
-              <Text style={styles.courseDescription}>{course.description}</Text>
+                <Text style={styles.courseDescription} numberOfLines={2}>
+                  {course.description}
+                </Text>
 
-              <View style={styles.courseFooter}>
-                <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(course.difficulty) }]}>
-                  <Text style={styles.difficultyText}>{getDifficultyLabel(course.difficulty)}</Text>
+                <View style={styles.courseFooter}>
+                  <View style={styles.courseInfo}>
+                    <Text style={styles.infoIcon}>⏱</Text>
+                    <Text style={styles.infoText}>{course.estimated_duration_minutes} min</Text>
+                  </View>
+                  <View style={styles.courseInfo}>
+                    <Text style={styles.infoIcon}>⭐</Text>
+                    <Text style={styles.infoText}>{course.points_reward} XP</Text>
+                  </View>
                 </View>
-                <Text style={styles.courseDuration}>{course.estimated_duration_minutes} min</Text>
-                <Text style={styles.coursePoints}>+{course.points_reward} pts</Text>
-              </View>
 
-              {isStarted && progress && progress.progress_percentage < 100 && (
-                <View style={styles.progressContainer}>
-                  <View style={[styles.progressBar, { width: `${progress.progress_percentage}%` }]} />
-                </View>
-              )}
+                {progress && progress.progress_percentage > 0 && (
+                  <View style={styles.progressContainer}>
+                    <View style={[styles.progressBar, { width: `${progress.progress_percentage}%` }]} />
+                  </View>
+                )}
+
+                {isCompleted && (
+                  <View style={styles.completedBadge}>
+                    <Text style={styles.completedText}>✓ Terminé</Text>
+                  </View>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
           );
         })}
@@ -164,25 +241,75 @@ export default function CoursesScreen() {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Text style={styles.closeButton}>✕</Text>
+          <LinearGradient
+            colors={selectedCourse ? getCourseGradient(courses.indexOf(selectedCourse)) : ['#5B52FF', '#7C3AED']}
+            style={styles.modalHeader}
+          >
+            <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeButton}>
+              <Text style={styles.closeButtonText}>←</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>{selectedCourse?.title}</Text>
-          </View>
+            <View style={styles.modalHeaderContent}>
+              <View style={styles.modalIconContainer}>
+                <Text style={styles.modalIcon}>
+                  {selectedCourse ? getCourseIcon(courses.indexOf(selectedCourse)) : '📚'}
+                </Text>
+              </View>
+              <Text style={styles.modalTitle}>{selectedCourse?.title}</Text>
+              <Text style={styles.modalSubtitle}>{selectedCourse?.description}</Text>
+
+              <View style={styles.modalStats}>
+                <View style={styles.modalStat}>
+                  <Text style={styles.modalStatIcon}>⏱</Text>
+                  <Text style={styles.modalStatText}>{selectedCourse?.estimated_duration_minutes} min</Text>
+                </View>
+                <View style={styles.modalStat}>
+                  <Text style={styles.modalStatIcon}>⭐</Text>
+                  <Text style={styles.modalStatText}>{selectedCourse?.points_reward} XP</Text>
+                </View>
+                <View style={styles.modalStat}>
+                  <Text style={styles.modalStatIcon}>📊</Text>
+                  <Text style={styles.modalStatText}>
+                    {selectedCourse ? getDifficultyLabel(selectedCourse.difficulty) : ''}
+                  </Text>
+                </View>
+              </View>
+
+              {userProgress.get(selectedCourse?.id || '') && (
+                <View style={styles.modalProgressContainer}>
+                  <Text style={styles.modalProgressText}>
+                    {userProgress.get(selectedCourse?.id || '')?.progress_percentage}% terminé
+                  </Text>
+                  <View style={styles.modalProgressBar}>
+                    <View
+                      style={[
+                        styles.modalProgressFill,
+                        { width: `${userProgress.get(selectedCourse?.id || '')?.progress_percentage || 0}%` }
+                      ]}
+                    />
+                  </View>
+                </View>
+              )}
+            </View>
+          </LinearGradient>
 
           <ScrollView style={styles.modalContent}>
-            {courseContent.map((content, index) => (
-              <View key={content.id} style={styles.contentBlock}>
-                <Text style={styles.contentTitle}>
-                  {index + 1}. {content.title}
-                </Text>
-                <Text style={styles.contentText}>{content.content}</Text>
-              </View>
-            ))}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>📚 Contenu du module</Text>
+              {courseContent.map((content, index) => (
+                <View key={content.id} style={styles.contentBlock}>
+                  <View style={styles.contentNumber}>
+                    <Text style={styles.contentNumberText}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.contentInfo}>
+                    <Text style={styles.contentTitle}>{content.title}</Text>
+                    <Text style={styles.contentText} numberOfLines={2}>{content.content}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
 
             <TouchableOpacity style={styles.completeButton} onPress={completeCourse}>
-              <Text style={styles.completeButtonText}>Terminer le cours</Text>
+              <Text style={styles.completeButtonText}>▶ Continuer le module</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -194,162 +321,306 @@ export default function CoursesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F5F7FA',
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F5F7FA',
   },
   header: {
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: 30,
     paddingHorizontal: 20,
-    backgroundColor: '#4F46E5',
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 5,
+    marginBottom: 8,
   },
   headerSubtitle: {
-    fontSize: 16,
-    color: '#E0E7FF',
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.9,
+    lineHeight: 20,
+  },
+  filterContainer: {
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  filterButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    marginRight: 10,
+  },
+  filterButtonActive: {
+    backgroundColor: '#5B52FF',
+  },
+  filterText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  filterTextActive: {
+    color: '#FFFFFF',
   },
   content: {
     flex: 1,
-    padding: 20,
+    padding: 15,
   },
   courseCard: {
-    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     padding: 20,
-    borderRadius: 15,
     marginBottom: 15,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
   },
   courseHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  courseTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    flex: 1,
-  },
-  completedBadge: {
-    fontSize: 24,
-    color: '#10B981',
-  },
-  courseDescription: {
-    fontSize: 14,
-    color: '#6B7280',
     marginBottom: 15,
-    lineHeight: 20,
   },
-  courseFooter: {
-    flexDirection: 'row',
+  iconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 10,
+  },
+  icon: {
+    fontSize: 28,
   },
   difficultyBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 15,
   },
   difficultyText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  courseDuration: {
-    fontSize: 14,
-    color: '#6B7280',
+  courseTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 8,
   },
-  coursePoints: {
+  courseDescription: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.9,
+    marginBottom: 15,
+    lineHeight: 20,
+  },
+  courseFooter: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  courseInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  infoIcon: {
+    fontSize: 16,
+  },
+  infoText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#4F46E5',
-    marginLeft: 'auto',
+    color: '#FFFFFF',
   },
   progressContainer: {
     height: 6,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 3,
     marginTop: 15,
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 3,
+  },
+  completedBadge: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    backgroundColor: 'rgba(16, 185, 129, 0.9)',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+  },
+  completedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F5F7FA',
   },
   modalHeader: {
     paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    backgroundColor: '#4F46E5',
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingBottom: 30,
   },
   closeButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 5,
+  },
+  closeButtonText: {
     fontSize: 28,
     color: '#FFFFFF',
-    marginRight: 15,
-    fontWeight: 'bold',
+    fontWeight: '600',
+  },
+  modalHeaderContent: {
+    paddingHorizontal: 20,
+  },
+  modalIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  modalIcon: {
+    fontSize: 40,
   },
   modalTitle: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    flex: 1,
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 15,
+    color: '#FFFFFF',
+    opacity: 0.9,
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  modalStats: {
+    flexDirection: 'row',
+    gap: 20,
+    marginBottom: 20,
+  },
+  modalStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  modalStatIcon: {
+    fontSize: 16,
+  },
+  modalStatText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  modalProgressContainer: {
+    marginTop: 10,
+  },
+  modalProgressText: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    opacity: 0.9,
+    marginBottom: 8,
+  },
+  modalProgressBar: {
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  modalProgressFill: {
+    height: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 4,
   },
   modalContent: {
     flex: 1,
-    padding: 20,
+    paddingTop: 10,
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 15,
   },
   contentBlock: {
+    flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    padding: 20,
+    padding: 15,
     borderRadius: 15,
-    marginBottom: 15,
+    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
+  },
+  contentNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#5B52FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  contentNumberText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  contentInfo: {
+    flex: 1,
   },
   contentTitle: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 10,
+    marginBottom: 4,
   },
   contentText: {
-    fontSize: 16,
-    color: '#4B5563',
-    lineHeight: 24,
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
   },
   completeButton: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#5B52FF',
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 15,
     alignItems: 'center',
+    marginHorizontal: 20,
     marginVertical: 20,
+    shadowColor: '#5B52FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   completeButtonText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
