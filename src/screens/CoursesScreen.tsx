@@ -172,6 +172,12 @@ export default function CoursesScreen() {
           const isCompleted = progress?.progress_percentage === 100;
           const gradient = getCourseGradient(index);
 
+          const badges = [
+            { icon: '🏆', text: 'CEI d\'Aigle' },
+            { icon: '🎬', text: 'Réalisateur Émergent' },
+            { icon: '✂️', text: 'Monteur Virtuose' },
+          ];
+
           return (
             <TouchableOpacity
               key={course.id}
@@ -184,24 +190,23 @@ export default function CoursesScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <View style={styles.courseHeader}>
-                  <View style={styles.iconContainer}>
-                    <Text style={styles.icon}>{getCourseIcon(index)}</Text>
-                  </View>
-                  <View style={styles.difficultyBadge}>
-                    <Text style={styles.difficultyText}>{getDifficultyLabel(course.difficulty)}</Text>
-                  </View>
+                <View style={styles.difficultyBadge}>
+                  <Text style={styles.difficultyText}>{getDifficultyLabel(course.difficulty)}</Text>
+                </View>
+
+                <View style={styles.iconContainer}>
+                  <Text style={styles.icon}>{getCourseIcon(index)}</Text>
                 </View>
 
                 <Text style={styles.courseTitle}>{course.title}</Text>
-                <Text style={styles.courseDescription} numberOfLines={2}>
+                <Text style={styles.courseDescription} numberOfLines={3}>
                   {course.description}
                 </Text>
 
                 <View style={styles.courseFooter}>
                   <View style={styles.courseInfo}>
                     <Text style={styles.infoIcon}>⏱</Text>
-                    <Text style={styles.infoText}>{course.estimated_duration_minutes} min</Text>
+                    <Text style={styles.infoText}>4 semaines</Text>
                   </View>
                   <View style={styles.courseInfo}>
                     <Text style={styles.infoIcon}>⭐</Text>
@@ -209,21 +214,32 @@ export default function CoursesScreen() {
                   </View>
                 </View>
 
-                {progress && progress.progress_percentage > 0 && (
-                  <View style={styles.progressContainer}>
-                    <View style={[styles.progressBar, { width: `${progress.progress_percentage}%` }]} />
-                  </View>
-                )}
-
-                {isCompleted && (
-                  <View style={styles.completedBadge}>
-                    <Text style={styles.completedText}>✓ Terminé</Text>
-                  </View>
-                )}
+                <View style={styles.badgeContainer}>
+                  <Text style={styles.badgeIcon}>{badges[index % badges.length].icon}</Text>
+                  <Text style={styles.badgeText}>{badges[index % badges.length].text}</Text>
+                </View>
               </LinearGradient>
             </TouchableOpacity>
           );
         })}
+
+        <View style={styles.statsSection}>
+          <Text style={styles.statsTitle}>📊 Statistiques globales</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statBox}>
+              <Text style={styles.statNumber}>{courses.length}</Text>
+              <Text style={styles.statLabel}>Modules{`\n`}disponibles</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statNumber}>3500</Text>
+              <Text style={styles.statLabel}>XP total{`\n`}possible</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statNumber}>12</Text>
+              <Text style={styles.statLabel}>Semaines de{`\n`}contenu</Text>
+            </View>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -287,33 +303,20 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   courseCard: {
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 24,
+    padding: 24,
     marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 5,
-  },
-  courseHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  iconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  icon: {
-    fontSize: 28,
+    position: 'relative',
   },
   difficultyBadge: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -323,6 +326,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  iconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  icon: {
+    fontSize: 32,
   },
   courseTitle: {
     fontSize: 20,
@@ -354,30 +369,61 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  progressContainer: {
-    height: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 3,
+  badgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 15,
     marginTop: 15,
-    overflow: 'hidden',
+    alignSelf: 'flex-start',
   },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 3,
+  badgeIcon: {
+    fontSize: 16,
+    marginRight: 6,
   },
-  completedBadge: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    backgroundColor: 'rgba(16, 185, 129, 0.9)',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-  },
-  completedText: {
-    fontSize: 12,
+  badgeText: {
+    fontSize: 13,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  statsSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    marginTop: 10,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 20,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  statBox: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statNumber: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#5B52FF',
+    marginBottom: 8,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 16,
   },
 });
