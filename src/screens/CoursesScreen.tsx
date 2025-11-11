@@ -6,20 +6,18 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getCourses, getCourseContent, getUserCourseProgress, startCourse, updateCourseProgress, getAllUserProgress } from '../services/courseService';
+import { getCourses, startCourse, getAllUserProgress } from '../services/courseService';
 import { getCurrentUser } from '../services/userService';
-import { Course, CourseContent, UserCourseProgress } from '../types/database';
+import { Course, UserCourseProgress } from '../types/database';
+import CourseDetailScreen from './CourseDetailScreen';
 
 export default function CoursesScreen() {
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState<Course[]>([]);
   const [userProgress, setUserProgress] = useState<Map<string, UserCourseProgress>>(new Map());
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  const [courseContent, setCourseContent] = useState<CourseContent[]>([]);
-  const [modalVisible, setModalVisible] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
 
   useEffect(() => {
@@ -52,34 +50,22 @@ export default function CoursesScreen() {
 
   const openCourse = async (course: Course) => {
     try {
-      setSelectedCourse(course);
-      const content = await getCourseContent(course.id);
-      setCourseContent(content);
-      setModalVisible(true);
-
       const user = await getCurrentUser();
       if (!user) return;
 
       if (!userProgress.has(course.id)) {
         await startCourse(user.id, course.id);
-        loadCourses();
+        await loadCourses();
       }
+
+      setSelectedCourse(course);
     } catch (error) {
       console.error('Error opening course:', error);
     }
   };
 
-  const completeCourse = async () => {
-    try {
-      const user = await getCurrentUser();
-      if (!user || !selectedCourse) return;
-
-      await updateCourseProgress(user.id, selectedCourse.id, 100);
-      setModalVisible(false);
-      loadCourses();
-    } catch (error) {
-      console.error('Error completing course:', error);
-    }
+  const closeCourse = () => {
+    setSelectedCourse(null);
   };
 
   const getCourseGradient = (index: number) => {
@@ -126,6 +112,10 @@ export default function CoursesScreen() {
   }
 
   const filteredCourses = getFilteredCourses();
+
+  if (selectedCourse) {
+    return <CourseDetailScreen course={selectedCourse} onBack={closeCourse} />;
+  }
 
   return (
     <View style={styles.container}>
@@ -235,86 +225,6 @@ export default function CoursesScreen() {
           );
         })}
       </ScrollView>
-
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <LinearGradient
-            colors={selectedCourse ? getCourseGradient(courses.indexOf(selectedCourse)) : ['#5B52FF', '#7C3AED']}
-            style={styles.modalHeader}
-          >
-            <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>←</Text>
-            </TouchableOpacity>
-            <View style={styles.modalHeaderContent}>
-              <View style={styles.modalIconContainer}>
-                <Text style={styles.modalIcon}>
-                  {selectedCourse ? getCourseIcon(courses.indexOf(selectedCourse)) : '📚'}
-                </Text>
-              </View>
-              <Text style={styles.modalTitle}>{selectedCourse?.title}</Text>
-              <Text style={styles.modalSubtitle}>{selectedCourse?.description}</Text>
-
-              <View style={styles.modalStats}>
-                <View style={styles.modalStat}>
-                  <Text style={styles.modalStatIcon}>⏱</Text>
-                  <Text style={styles.modalStatText}>{selectedCourse?.estimated_duration_minutes} min</Text>
-                </View>
-                <View style={styles.modalStat}>
-                  <Text style={styles.modalStatIcon}>⭐</Text>
-                  <Text style={styles.modalStatText}>{selectedCourse?.points_reward} XP</Text>
-                </View>
-                <View style={styles.modalStat}>
-                  <Text style={styles.modalStatIcon}>📊</Text>
-                  <Text style={styles.modalStatText}>
-                    {selectedCourse ? getDifficultyLabel(selectedCourse.difficulty) : ''}
-                  </Text>
-                </View>
-              </View>
-
-              {userProgress.get(selectedCourse?.id || '') && (
-                <View style={styles.modalProgressContainer}>
-                  <Text style={styles.modalProgressText}>
-                    {userProgress.get(selectedCourse?.id || '')?.progress_percentage}% terminé
-                  </Text>
-                  <View style={styles.modalProgressBar}>
-                    <View
-                      style={[
-                        styles.modalProgressFill,
-                        { width: `${userProgress.get(selectedCourse?.id || '')?.progress_percentage || 0}%` }
-                      ]}
-                    />
-                  </View>
-                </View>
-              )}
-            </View>
-          </LinearGradient>
-
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>📚 Contenu du module</Text>
-              {courseContent && courseContent.map((content, index) => (
-                <View key={content.id} style={styles.contentBlock}>
-                  <View style={styles.contentNumber}>
-                    <Text style={styles.contentNumberText}>{index + 1}</Text>
-                  </View>
-                  <View style={styles.contentInfo}>
-                    <Text style={styles.contentTitle}>{content.title}</Text>
-                    <Text style={styles.contentText} numberOfLines={2}>{content.content}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-
-            <TouchableOpacity style={styles.completeButton} onPress={completeCourse}>
-              <Text style={styles.completeButtonText}>▶ Continuer le module</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -468,161 +378,6 @@ const styles = StyleSheet.create({
   completedText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#F5F7FA',
-  },
-  modalHeader: {
-    paddingTop: 60,
-    paddingBottom: 30,
-  },
-  closeButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 5,
-  },
-  closeButtonText: {
-    fontSize: 28,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  modalHeaderContent: {
-    paddingHorizontal: 20,
-  },
-  modalIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  modalIcon: {
-    fontSize: 40,
-  },
-  modalTitle: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 15,
-    color: '#FFFFFF',
-    opacity: 0.9,
-    lineHeight: 22,
-    marginBottom: 20,
-  },
-  modalStats: {
-    flexDirection: 'row',
-    gap: 20,
-    marginBottom: 20,
-  },
-  modalStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  modalStatIcon: {
-    fontSize: 16,
-  },
-  modalStatText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  modalProgressContainer: {
-    marginTop: 10,
-  },
-  modalProgressText: {
-    fontSize: 13,
-    color: '#FFFFFF',
-    opacity: 0.9,
-    marginBottom: 8,
-  },
-  modalProgressBar: {
-    height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  modalProgressFill: {
-    height: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 4,
-  },
-  modalContent: {
-    flex: 1,
-    paddingTop: 10,
-  },
-  section: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 15,
-  },
-  contentBlock: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    padding: 15,
-    borderRadius: 15,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  contentNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#5B52FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  contentNumberText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  contentInfo: {
-    flex: 1,
-  },
-  contentTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  contentText: {
-    fontSize: 13,
-    color: '#6B7280',
-    lineHeight: 18,
-  },
-  completeButton: {
-    backgroundColor: '#5B52FF',
-    paddingVertical: 16,
-    borderRadius: 15,
-    alignItems: 'center',
-    marginHorizontal: 20,
-    marginVertical: 20,
-    shadowColor: '#5B52FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  completeButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
     color: '#FFFFFF',
   },
 });

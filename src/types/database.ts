@@ -106,3 +106,67 @@ export interface UserAchievement {
   achievement_id: string;
   earned_at: string;
 }
+
+export interface CourseWeek {
+  id: string;
+  course_id: string;
+  week_number: number;
+  title: string;
+  description: string;
+  order_index: number;
+  created_at: string;
+}
+
+export interface CourseActivity {
+  id: string;
+  week_id: string;
+  day_number: number;
+  title: string;
+  activity_type: 'COURS' | 'VIDÉO' | 'QUIZ' | 'EXERCICE';
+  description: string;
+  duration_minutes: number;
+  xp_reward: number;
+  order_index: number;
+  created_at: string;
+}
+
+export interface CourseProject {
+  id: string;
+  course_id: string;
+  title: string;
+  description: string;
+  xp_reward: number;
+  deadline_days: number;
+  requirements: string[];
+  created_at: string;
+}
+
+export interface ProjectEvaluationCriteria {
+  id: string;
+  project_id: string;
+  title: string;
+  description: string;
+  max_points: number;
+  order_index: number;
+  created_at: string;
+}
+
+export interface UserActivityCompletion {
+  id: string;
+  user_id: string;
+  activity_id: string;
+  completed: boolean;
+  completed_at?: string;
+  created_at: string;
+}
+
+export interface UserProjectSubmission {
+  id: string;
+  user_id: string;
+  project_id: string;
+  submission_data: Record<string, any>;
+  total_score: number;
+  submitted_at: string;
+  evaluated_at?: string;
+  created_at: string;
+}
