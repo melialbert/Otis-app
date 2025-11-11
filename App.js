@@ -136,7 +136,7 @@ export default function App() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4F46E5" />
+        <ActivityIndicator size={48} color="#4F46E5" />
       </View>
     );
   }
