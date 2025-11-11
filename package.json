@@ -1,0 +1,31 @@
+{
+  "name": "learning-gamification-app",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "build": "echo 'Build not required for Expo Go development'"
+  },
+  "dependencies": {
+    "expo": "~54.0.23",
+    "expo-status-bar": "~3.0.8",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "@supabase/supabase-js": "^2.39.0",
+    "@react-native-async-storage/async-storage": "^1.21.0",
+    "react-native-url-polyfill": "^2.0.0",
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/bottom-tabs": "^6.5.11",
+    "react-native-safe-area-context": "^4.8.2",
+    "react-native-screens": "^3.29.0",
+    "expo-linear-gradient": "~14.0.1",
+    "react-native-calendars": "^1.1305.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0"
+  },
+  "private": true
+}
