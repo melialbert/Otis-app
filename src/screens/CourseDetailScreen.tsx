@@ -130,7 +130,7 @@ export default function CourseDetailScreen({ course, onBack }: CourseDetailScree
     const activity = activities.find(a => a.id === activityId);
     return sum + (activity?.xp_reward || 0);
   }, 0);
-  const progressPercentage = totalXP > 0 ? Math.round((earnedXP / totalXP) * 100) : 0);
+  const progressPercentage = totalXP > 0 ? Math.round((earnedXP / totalXP) * 100) : 0;
 
   if (loading) {
     return (
