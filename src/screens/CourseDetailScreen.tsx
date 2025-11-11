@@ -8,9 +8,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Course, CourseWeek, CourseActivity, CourseProject, ProjectEvaluationCriteria, UserActivityCompletion } from '../types/database';
-import { getCourseWeeks, getWeekActivities, getCourseProject, getProjectCriteria, getUserActivityCompletions, toggleActivityCompletion } from '../services/courseDetailService';
+import { Course, CourseWeek, CourseActivity } from '../types/database';
+import { getCourseWeeks, getCourseActivities } from '../services/courseDetailService';
 import { getCurrentUser } from '../services/userService';
+import { getUserActivityProgress } from '../services/activityService';
 
 interface CourseDetailScreenProps {
   course: Course;
@@ -20,37 +21,36 @@ interface CourseDetailScreenProps {
 export default function CourseDetailScreen({ course, onBack }: CourseDetailScreenProps) {
   const [loading, setLoading] = useState(true);
   const [weeks, setWeeks] = useState<CourseWeek[]>([]);
-  const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
   const [activities, setActivities] = useState<CourseActivity[]>([]);
-  const [project, setProject] = useState<CourseProject | null>(null);
-  const [criteria, setCriteria] = useState<ProjectEvaluationCriteria[]>([]);
-  const [completions, setCompletions] = useState<Map<string, boolean>>(new Map());
-  const [showProjectDetails, setShowProjectDetails] = useState(false);
+  const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
+  const [completedActivities, setCompletedActivities] = useState<Set<string>>(new Set());
+  const [showActivities, setShowActivities] = useState(false);
 
   useEffect(() => {
     loadCourseDetails();
   }, []);
 
-  useEffect(() => {
-    if (weeks.length > 0) {
-      loadWeekActivities(weeks[selectedWeekIndex].id);
-    }
-  }, [selectedWeekIndex, weeks]);
-
   const loadCourseDetails = async () => {
     try {
-      const [weeksData, projectData] = await Promise.all([
+      const user = await getCurrentUser();
+      if (!user) return;
+
+      const [weeksData, activitiesData] = await Promise.all([
         getCourseWeeks(course.id),
-        getCourseProject(course.id),
+        getCourseActivities(course.id),
       ]);
 
       setWeeks(weeksData);
-      setProject(projectData);
+      setActivities(activitiesData);
 
-      if (projectData) {
-        const criteriaData = await getProjectCriteria(projectData.id);
-        setCriteria(criteriaData);
+      const completedSet = new Set<string>();
+      for (const activity of activitiesData) {
+        const progress = await getUserActivityProgress(user.id, activity.id);
+        if (progress?.completed) {
+          completedSet.add(activity.id);
+        }
       }
+      setCompletedActivities(completedSet);
     } catch (error) {
       console.error('Error loading course details:', error);
     } finally {
@@ -58,89 +58,45 @@ export default function CourseDetailScreen({ course, onBack }: CourseDetailScree
     }
   };
 
-  const loadWeekActivities = async (weekId: string) => {
-    try {
-      const activitiesData = await getWeekActivities(weekId);
-      setActivities(activitiesData);
-
-      const user = await getCurrentUser();
-      if (user && activitiesData.length > 0) {
-        const activityIds = activitiesData.map(a => a.id);
-        const completionsData = await getUserActivityCompletions(user.id, activityIds);
-
-        const completionsMap = new Map();
-        completionsData.forEach(c => {
-          completionsMap.set(c.activity_id, c.completed);
-        });
-        setCompletions(completionsMap);
-      }
-    } catch (error) {
-      console.error('Error loading week activities:', error);
-    }
-  };
-
-  const handleActivityToggle = async (activityId: string) => {
-    try {
-      const user = await getCurrentUser();
-      if (!user) return;
-
-      const currentStatus = completions.get(activityId) || false;
-      const newStatus = !currentStatus;
-
-      await toggleActivityCompletion(user.id, activityId, newStatus);
-
-      setCompletions(prev => {
-        const updated = new Map(prev);
-        updated.set(activityId, newStatus);
-        return updated;
-      });
-    } catch (error) {
-      console.error('Error toggling activity:', error);
-    }
-  };
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'COURS':
-        return '📖';
-      case 'VIDÉO':
-        return '🎬';
-      case 'QUIZ':
-        return '❓';
-      case 'EXERCICE':
-        return '✏️';
-      default:
-        return '📝';
-    }
-  };
-
-  const getActivityTypeColor = (type: string) => {
-    switch (type) {
-      case 'COURS':
-        return '#06B6D4';
-      case 'VIDÉO':
-        return '#8B5CF6';
-      case 'QUIZ':
-        return '#EF4444';
-      case 'EXERCICE':
-        return '#F59E0B';
-      default:
-        return '#6B7280';
-    }
-  };
-
   const getCourseGradient = () => {
-    const gradients = [
-      ['#EC4899', '#DB2777'],
-      ['#8B5CF6', '#7C3AED'],
-      ['#06B6D4', '#0891B2'],
-    ];
-    return gradients[0];
+    if (course.title.toLowerCase().includes('photo')) {
+      return ['#EC4899', '#DB2777'];
+    } else if (course.title.toLowerCase().includes('vid')) {
+      return ['#8B5CF6', '#7C3AED'];
+    } else if (course.title.toLowerCase().includes('montage')) {
+      return ['#06B6D4', '#0891B2'];
+    }
+    return ['#5B52FF', '#7C3AED'];
+  };
+
+  const getCourseIcon = () => {
+    if (course.title.toLowerCase().includes('photo')) return '📷';
+    if (course.title.toLowerCase().includes('vid')) return '🎬';
+    if (course.title.toLowerCase().includes('montage')) return '✂️';
+    return '📚';
+  };
+
+  const getBadgeText = () => {
+    if (course.title.toLowerCase().includes('photo')) return '🏆 CEI d\'Aigle';
+    if (course.title.toLowerCase().includes('vid')) return '🎬 Réalisateur Émergent';
+    if (course.title.toLowerCase().includes('montage')) return '✂️ Monteur Virtuose';
+    return '🏆 Badge';
+  };
+
+  const getSelectedWeek = () => {
+    return weeks[selectedWeekIndex];
+  };
+
+  const getWeekActivities = () => {
+    const selectedWeek = getSelectedWeek();
+    if (!selectedWeek) return [];
+    return activities.filter(a => a.week_id === selectedWeek.id);
   };
 
   const groupActivitiesByDay = () => {
+    const weekActivities = getWeekActivities();
     const grouped: Record<number, CourseActivity[]> = {};
-    activities.forEach(activity => {
+    weekActivities.forEach(activity => {
       if (!grouped[activity.day_number]) {
         grouped[activity.day_number] = [];
       }
@@ -148,6 +104,33 @@ export default function CourseDetailScreen({ course, onBack }: CourseDetailScree
     });
     return grouped;
   };
+
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'lecture': return '📖';
+      case 'video': return '🎥';
+      case 'quiz': return '❓';
+      case 'exercise': return '💪';
+      default: return '📝';
+    }
+  };
+
+  const getActivityTypeLabel = (type: string) => {
+    switch (type) {
+      case 'lecture': return 'COURS';
+      case 'video': return 'VIDÉO';
+      case 'quiz': return 'QUIZ';
+      case 'exercise': return 'EXERCICE';
+      default: return type.toUpperCase();
+    }
+  };
+
+  const totalXP = activities.reduce((sum, a) => sum + a.xp_reward, 0);
+  const earnedXP = Array.from(completedActivities).reduce((sum, activityId) => {
+    const activity = activities.find(a => a.id === activityId);
+    return sum + (activity?.xp_reward || 0);
+  }, 0);
+  const progressPercentage = totalXP > 0 ? Math.round((earnedXP / totalXP) * 100) : 0);
 
   if (loading) {
     return (
@@ -160,11 +143,6 @@ export default function CourseDetailScreen({ course, onBack }: CourseDetailScree
   const gradient = getCourseGradient();
   const groupedActivities = groupActivitiesByDay();
 
-  const totalWeeks = weeks.length;
-  const totalXP = weeks.reduce((sum, week) => {
-    return sum + activities.filter(a => a.week_id === week.id).reduce((s, a) => s + a.xp_reward, 0);
-  }, 0);
-
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -172,12 +150,12 @@ export default function CourseDetailScreen({ course, onBack }: CourseDetailScree
         style={styles.header}
       >
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← (tabs)</Text>
+          <Text style={styles.backButtonText}>‹ (tabs)</Text>
         </TouchableOpacity>
         <Text style={styles.headerSubtitle}>{course.title}</Text>
 
         <View style={styles.headerIcon}>
-          <Text style={styles.headerIconText}>✂️</Text>
+          <Text style={styles.headerIconText}>{getCourseIcon()}</Text>
         </View>
 
         <Text style={styles.headerMainTitle}>{course.title}</Text>
@@ -185,186 +163,226 @@ export default function CourseDetailScreen({ course, onBack }: CourseDetailScree
 
         <View style={styles.headerBadges}>
           <View style={styles.headerBadge}>
-            <Text style={styles.headerBadgeIcon}>📅</Text>
-            <Text style={styles.headerBadgeText}>{totalWeeks} semaines</Text>
+            <Text style={styles.headerBadgeIcon}>🗓</Text>
+            <Text style={styles.headerBadgeText}>{weeks.length} semaines</Text>
           </View>
           <View style={styles.headerBadge}>
             <Text style={styles.headerBadgeIcon}>⭐</Text>
             <Text style={styles.headerBadgeText}>{totalXP} XP</Text>
           </View>
           <View style={styles.headerBadge}>
-            <Text style={styles.headerBadgeIcon}>📹</Text>
-            <Text style={styles.headerBadgeText}>Monteur Virtuose</Text>
+            <Text style={styles.headerBadgeText}>{getBadgeText()}</Text>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.startButton}>
-          <Text style={styles.startButtonText}>🚀 Démarrer le module</Text>
+        <View style={styles.progressSection}>
+          <Text style={styles.progressText}>{earnedXP} / {totalXP} XP</Text>
+          <Text style={styles.progressPercentage}>{progressPercentage}%</Text>
+        </View>
+        <View style={styles.progressBarContainer}>
+          <View style={[styles.progressBarFill, { width: `${progressPercentage}%` }]} />
+        </View>
+
+        <TouchableOpacity style={styles.continueButton}>
+          <Text style={styles.continueButtonText}>▶ Continuer le module</Text>
         </TouchableOpacity>
       </LinearGradient>
 
       <ScrollView style={styles.content}>
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>📋 Informations</Text>
+          <View style={styles.infoHeader}>
+            <Text style={styles.infoIcon}>📋</Text>
+            <Text style={styles.infoTitle}>Informations</Text>
+          </View>
+
           <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>📅</Text>
+            <View style={styles.infoIconContainer}>
+              <Text style={styles.infoRowIcon}>📅</Text>
+            </View>
             <Text style={styles.infoLabel}>Dates</Text>
-            <Text style={styles.infoValue}>01/01/2026 - 31/01/2026</Text>
+            <Text style={styles.infoValue}>01/11/2025 - 30/11/2025</Text>
           </View>
+
           <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>📊</Text>
+            <View style={styles.infoIconContainer}>
+              <Text style={styles.infoRowIcon}>📊</Text>
+            </View>
             <Text style={styles.infoLabel}>Niveau</Text>
-            <Text style={styles.infoBadge}>{course.difficulty === 'beginner' ? 'Débutant' : course.difficulty === 'intermediate' ? 'Intermédiaire' : 'Avancé'}</Text>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelBadgeText}>
+                {course.difficulty === 'beginner' ? 'Débutant' : course.difficulty === 'intermediate' ? 'Intermédiaire' : 'Avancé'}
+              </Text>
+            </View>
           </View>
+
           <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>📚</Text>
+            <View style={styles.infoIconContainer}>
+              <Text style={styles.infoRowIcon}>📚</Text>
+            </View>
             <Text style={styles.infoLabel}>Semaines</Text>
-            <Text style={styles.infoValue}>{totalWeeks} semaines</Text>
+            <Text style={styles.infoValue}>{weeks.length} semaines</Text>
           </View>
         </View>
-        {weeks.length > 0 && (
-          <View style={styles.weeksContainer}>
-            <Text style={styles.sectionTitle}>🗓 Semaines</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.weeksScroll}>
-              {weeks.map((week, index) => (
-                <TouchableOpacity
-                  key={week.id}
-                  style={[
-                    styles.weekTab,
-                    selectedWeekIndex === index && styles.weekTabActive,
-                  ]}
-                  onPress={() => setSelectedWeekIndex(index)}
-                >
-                  <Text
-                    style={[
-                      styles.weekTabText,
-                      selectedWeekIndex === index && styles.weekTabTextActive,
-                    ]}
-                  >
-                    Semaine {week.week_number}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
 
-        <View style={styles.activitiesContainer}>
-          <Text style={styles.sectionTitle}>🎯 Activités</Text>
-          {Object.keys(groupedActivities).sort((a, b) => Number(a) - Number(b)).map(dayNumber => (
-            <View key={dayNumber} style={styles.daySection}>
-              <Text style={styles.dayTitle}>Jour {dayNumber} - {groupedActivities[Number(dayNumber)][0].title}</Text>
-              {groupedActivities[Number(dayNumber)].map(activity => {
-                const isCompleted = completions.get(activity.id) || false;
-                return (
-                  <TouchableOpacity
-                    key={activity.id}
-                    style={[
-                      styles.activityCard,
-                      isCompleted && styles.activityCardCompleted,
-                    ]}
-                    onPress={() => handleActivityToggle(activity.id)}
-                  >
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>🗓</Text>
+            <Text style={styles.sectionTitle}>Semaines</Text>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.weekTabs}>
+            {weeks.map((week, index) => (
+              <TouchableOpacity
+                key={week.id}
+                style={[
+                  styles.weekTab,
+                  selectedWeekIndex === index && styles.weekTabActive,
+                ]}
+                onPress={() => {
+                  setSelectedWeekIndex(index);
+                  setShowActivities(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.weekTabText,
+                    selectedWeekIndex === index && styles.weekTabTextActive,
+                  ]}
+                >
+                  Semaine {week.week_number}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {getSelectedWeek() && (
+            <View style={styles.weekContent}>
+              <View style={styles.weekHeader}>
+                <Text style={styles.weekLabel}>AINÉ {selectedWeekIndex + 1}</Text>
+                <Text style={styles.weekXP}>⭐ {getWeekActivities().reduce((s, a) => s + a.xp_reward, 0)} XP</Text>
+              </View>
+              <Text style={styles.weekTitle}>{getSelectedWeek().title}</Text>
+              <Text style={styles.weekDescription}>{getSelectedWeek().description}</Text>
+
+              <View style={styles.activityList}>
+                {getWeekActivities().map((activity, index) => (
+                  <View key={activity.id} style={styles.activityItem}>
+                    <View style={styles.activityNumber}>
+                      <Text style={styles.activityNumberText}>{index + 1}</Text>
+                    </View>
                     <View style={styles.activityContent}>
-                      <View style={styles.activityIconContainer}>
-                        <Text style={styles.activityIcon}>{getActivityIcon(activity.activity_type)}</Text>
+                      <Text style={styles.activityTitle}>{activity.title}</Text>
+                      <Text style={styles.activityXP}>{activity.xp_reward} XP</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={styles.activitiesToggle}
+          onPress={() => setShowActivities(!showActivities)}
+        >
+          <View style={styles.activitiesToggleContent}>
+            <Text style={styles.activitiesToggleIcon}>🎯</Text>
+            <Text style={styles.activitiesToggleText}>Activités</Text>
+          </View>
+          <Text style={styles.activitiesToggleArrow}>{showActivities ? '▼' : '▶'}</Text>
+        </TouchableOpacity>
+
+        {showActivities && (
+          <View style={styles.activitiesSection}>
+            {Object.entries(groupedActivities).sort(([a], [b]) => Number(a) - Number(b)).map(([day, dayActivities]) => (
+              <View key={day}>
+                <Text style={styles.dayTitle}>Jour {day} - {dayActivities[0]?.title}</Text>
+                {dayActivities.map(activity => {
+                  const isCompleted = completedActivities.has(activity.id);
+                  return (
+                    <View key={activity.id} style={[styles.activityCard, isCompleted && styles.activityCardCompleted]}>
+                      <View style={styles.activityCardIcon}>
+                        <Text style={styles.activityCardIconText}>{getActivityIcon(activity.activity_type)}</Text>
                       </View>
-                      <View style={styles.activityInfo}>
-                        <View style={styles.activityHeader}>
-                          <View style={[styles.activityTypeBadge, { backgroundColor: getActivityTypeColor(activity.activity_type) }]}>
-                            <Text style={styles.activityTypeText}>{activity.activity_type}</Text>
-                          </View>
-                        </View>
-                        <Text style={styles.activityTitle}>{activity.title}</Text>
-                        <View style={styles.activityMeta}>
-                          <Text style={styles.activityMetaText}>⏱ {activity.duration_minutes} min</Text>
-                          <Text style={styles.activityMetaText}>⭐ {activity.xp_reward} XP</Text>
+                      <View style={styles.activityCardContent}>
+                        <Text style={styles.activityCardType}>{getActivityTypeLabel(activity.activity_type)}</Text>
+                        <Text style={styles.activityCardTitle}>{activity.title}</Text>
+                        <View style={styles.activityCardFooter}>
+                          <Text style={styles.activityCardTime}>⏱ {activity.estimated_duration_minutes} min</Text>
+                          <Text style={styles.activityCardXP}>⭐ {activity.xp_reward} XP</Text>
                         </View>
                       </View>
                       {isCompleted && (
-                        <View style={styles.completionCheck}>
-                          <Text style={styles.completionCheckText}>✓</Text>
+                        <View style={styles.activityCardCheck}>
+                          <Text style={styles.activityCardCheckIcon}>✓</Text>
                         </View>
                       )}
                     </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          ))}
-        </View>
-
-        {project && (
-          <View style={styles.projectContainer}>
-            <Text style={styles.sectionTitle}>🎯 Projet Final</Text>
-            <View style={styles.projectCard}>
-              <Text style={styles.projectTitle}>{project.title}</Text>
-              <Text style={styles.projectDescription}>{project.description}</Text>
-
-              <View style={styles.projectMeta}>
-                <View style={styles.projectMetaItem}>
-                  <Text style={styles.projectMetaIcon}>⭐</Text>
-                  <Text style={styles.projectMetaText}>{project.xp_reward} points</Text>
-                </View>
-                <View style={styles.projectMetaItem}>
-                  <Text style={styles.projectMetaIcon}>📅</Text>
-                  <Text style={styles.projectMetaText}>{new Date().toLocaleDateString('fr-FR')}</Text>
-                </View>
+                  );
+                })}
               </View>
-
-              {!showProjectDetails ? (
-                <>
-                  <Text style={styles.requirementsTitle}>Exigences :</Text>
-                  {project.requirements.slice(0, 3).map((req, index) => (
-                    <View key={index} style={styles.requirementItem}>
-                      <Text style={styles.requirementBullet}>•</Text>
-                      <Text style={styles.requirementText}>{req}</Text>
-                    </View>
-                  ))}
-
-                  <TouchableOpacity
-                    style={styles.detailsButton}
-                    onPress={() => setShowProjectDetails(true)}
-                  >
-                    <Text style={styles.detailsButtonText}>Voir les détails</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.requirementsTitle}>Exigences :</Text>
-                  {project.requirements.map((req, index) => (
-                    <View key={index} style={styles.requirementItem}>
-                      <Text style={styles.requirementBullet}>•</Text>
-                      <Text style={styles.requirementText}>{req}</Text>
-                    </View>
-                  ))}
-
-                  {criteria.length > 0 && (
-                    <View style={styles.criteriaContainer}>
-                      <Text style={styles.criteriaTitle}>📊 Critères d'évaluation</Text>
-                      {criteria.map(criterion => (
-                        <View key={criterion.id} style={styles.criterionItem}>
-                          <View style={styles.criterionHeader}>
-                            <Text style={styles.criterionTitle}>{criterion.title}</Text>
-                            <Text style={styles.criterionPoints}>{criterion.max_points} pts</Text>
-                          </View>
-                          <Text style={styles.criterionDescription}>{criterion.description}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-
-                  <TouchableOpacity
-                    style={styles.detailsButton}
-                    onPress={() => setShowProjectDetails(false)}
-                  >
-                    <Text style={styles.detailsButtonText}>Masquer les détails</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
+            ))}
           </View>
         )}
+
+        <View style={styles.projectSection}>
+          <View style={styles.projectHeader}>
+            <Text style={styles.projectIcon}>🎯</Text>
+            <Text style={styles.projectTitle}>Projet Final</Text>
+          </View>
+
+          <View style={styles.projectCard}>
+            <Text style={styles.projectCardTitle}>Raconte ton histoire en 5 photos</Text>
+            <Text style={styles.projectCardDescription}>
+              Créer une mini-série photographique cohérente de 5 photographies qui racontent une histoire.
+            </Text>
+
+            <View style={styles.projectMeta}>
+              <View style={styles.projectMetaItem}>
+                <Text style={styles.projectMetaIcon}>⭐</Text>
+                <Text style={styles.projectMetaText}>100 points</Text>
+              </View>
+              <View style={styles.projectMetaItem}>
+                <Text style={styles.projectMetaIcon}>📅</Text>
+                <Text style={styles.projectMetaText}>30/11/2025</Text>
+              </View>
+            </View>
+
+            <Text style={styles.projectRequirementsTitle}>Exigences :</Text>
+            <Text style={styles.projectRequirement}>• Au moins 1 photo en grande ouverture (f/1.4 - f/2.8)</Text>
+            <Text style={styles.projectRequirement}>• Au moins 1 photo en petite ouverture (f/8 - f/16)</Text>
+            <Text style={styles.projectRequirement}>• Au moins 1 photo avec vitesse rapide (≥1/500)</Text>
+            <Text style={styles.projectRequirement}>• Variété dans les cadrages</Text>
+            <Text style={styles.projectRequirement}>• Cohérence esthétique</Text>
+
+            <TouchableOpacity style={styles.projectButton}>
+              <Text style={styles.projectButtonText}>Voir les détails</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.criteriaSection}>
+          <View style={styles.criteriaHeader}>
+            <Text style={styles.criteriaIcon}>📊</Text>
+            <Text style={styles.criteriaTitle}>Critères d'évaluation</Text>
+          </View>
+
+          <View style={styles.criteriaCard}>
+            <View style={styles.criteriaItem}>
+              <Text style={styles.criteriaItemTitle}>Maîtrise technique</Text>
+              <Text style={styles.criteriaItemPoints}>30 pts</Text>
+            </View>
+            <Text style={styles.criteriaItemDescription}>Triangle d'exposition, netteté</Text>
+          </View>
+
+          <View style={styles.criteriaCard}>
+            <View style={styles.criteriaItem}>
+              <Text style={styles.criteriaItemTitle}>Composition</Text>
+              <Text style={styles.criteriaItemPoints}>25 pts</Text>
+            </View>
+            <Text style={styles.criteriaItemDescription}>Règle des tiers, équilibre</Text>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -382,121 +400,157 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F7FA',
   },
   header: {
-    paddingTop: 60,
-    paddingBottom: 30,
+    paddingTop: 50,
+    paddingBottom: 25,
     paddingHorizontal: 20,
     alignItems: 'center',
   },
   backButton: {
     alignSelf: 'flex-start',
-    marginBottom: 10,
+    marginBottom: 5,
   },
   backButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#FFFFFF',
     fontWeight: '600',
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#FFFFFF',
-    opacity: 0.9,
-    marginBottom: 20,
+    opacity: 0.95,
+    marginBottom: 15,
   },
   headerIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
+    width: 70,
+    height: 70,
+    borderRadius: 15,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 15,
   },
   headerIconText: {
-    fontSize: 40,
+    fontSize: 36,
   },
   headerMainTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 10,
+    marginBottom: 8,
     textAlign: 'center',
   },
   headerDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#FFFFFF',
-    opacity: 0.9,
+    opacity: 0.95,
     textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 20,
+    marginBottom: 15,
+    lineHeight: 18,
   },
   headerBadges: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
+    gap: 8,
+    marginBottom: 15,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   headerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 15,
-    gap: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    gap: 4,
   },
   headerBadgeIcon: {
-    fontSize: 14,
+    fontSize: 12,
   },
   headerBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  startButton: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 14,
-    paddingHorizontal: 30,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
+  progressSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 8,
   },
-  startButtonText: {
-    fontSize: 16,
+  progressText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  progressPercentage: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  progressBarContainer: {
+    width: '100%',
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 15,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 4,
+  },
+  continueButton: {
+    backgroundColor: '#5B52FF',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+    width: '100%',
+    alignItems: 'center',
+  },
+  continueButtonText: {
+    fontSize: 15,
     fontWeight: 'bold',
-    color: '#5B52FF',
+    color: '#FFFFFF',
   },
   content: {
     flex: 1,
   },
   infoCard: {
     backgroundColor: '#FFFFFF',
-    margin: 20,
-    padding: 20,
-    borderRadius: 20,
+    margin: 15,
+    padding: 15,
+    borderRadius: 15,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  infoIcon: {
+    fontSize: 18,
+    marginRight: 8,
   },
   infoTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#1F2937',
-    marginBottom: 15,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    paddingVertical: 10,
   },
-  infoIcon: {
-    fontSize: 20,
-    width: 40,
+  infoIconContainer: {
+    width: 35,
+  },
+  infoRowIcon: {
+    fontSize: 18,
   },
   infoLabel: {
     flex: 1,
@@ -508,31 +562,51 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     fontWeight: '500',
   },
-  infoBadge: {
+  levelBadge: {
+    backgroundColor: '#EDE9FE',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+  },
+  levelBadgeText: {
     fontSize: 13,
     color: '#5B52FF',
     fontWeight: '600',
   },
-  weeksContainer: {
+  sectionCard: {
     backgroundColor: '#FFFFFF',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    marginHorizontal: 15,
+    marginBottom: 15,
+    padding: 15,
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  sectionIcon: {
+    fontSize: 18,
+    marginRight: 8,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#1F2937',
-    marginBottom: 12,
   },
-  weeksScroll: {
+  weekTabs: {
     flexDirection: 'row',
+    marginBottom: 15,
   },
   weekTab: {
     paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    paddingHorizontal: 18,
+    borderRadius: 18,
     backgroundColor: '#F3F4F6',
     marginRight: 10,
     borderWidth: 2,
@@ -543,207 +617,334 @@ const styles = StyleSheet.create({
     borderColor: '#5B52FF',
   },
   weekTabText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#6B7280',
   },
   weekTabTextActive: {
     color: '#5B52FF',
   },
-  activitiesContainer: {
-    padding: 20,
+  weekContent: {
+    marginTop: 10,
   },
-  daySection: {
-    marginBottom: 20,
+  weekHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  dayTitle: {
-    fontSize: 16,
+  weekLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#EC4899',
+    letterSpacing: 0.5,
+  },
+  weekXP: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 12,
+    color: '#F59E0B',
   },
-  activityCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 10,
-    borderWidth: 2,
+  weekTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 5,
+  },
+  weekDescription: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 15,
+    lineHeight: 18,
+  },
+  activityList: {
+    gap: 10,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  activityCardCompleted: {
-    borderColor: '#10B981',
-    backgroundColor: '#F0FDF4',
+  activityNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#5B52FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  activityNumberText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   activityContent: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  activityTitle: {
+    fontSize: 13,
+    color: '#1F2937',
+    fontWeight: '500',
+    flex: 1,
+  },
+  activityXP: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  activitiesToggle: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 15,
+    marginBottom: 15,
+    padding: 15,
+    borderRadius: 15,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  activitiesToggleContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  activityIconContainer: {
-    width: 48,
-    height: 48,
+  activitiesToggleIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  activitiesToggleText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  activitiesToggleArrow: {
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  activitiesSection: {
+    marginHorizontal: 15,
+    marginBottom: 15,
+  },
+  dayTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 10,
+  },
+  activityCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  activityCardCompleted: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#10B981',
+  },
+  activityCardIcon: {
+    width: 45,
+    height: 45,
     borderRadius: 12,
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  activityIcon: {
+  activityCardIconText: {
     fontSize: 24,
   },
-  activityInfo: {
+  activityCardContent: {
     flex: 1,
   },
-  activityHeader: {
+  activityCardType: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#6B7280',
+    letterSpacing: 0.5,
     marginBottom: 4,
   },
-  activityTypeBadge: {
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  activityTypeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  activityTitle: {
+  activityCardTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: 5,
   },
-  activityMeta: {
+  activityCardFooter: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 15,
   },
-  activityMetaText: {
-    fontSize: 12,
+  activityCardTime: {
+    fontSize: 11,
     color: '#6B7280',
   },
-  completionCheck: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  activityCardXP: {
+    fontSize: 11,
+    color: '#F59E0B',
+    fontWeight: '600',
+  },
+  activityCardCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#10B981',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  completionCheckText: {
-    fontSize: 18,
+  activityCardCheckIcon: {
+    fontSize: 16,
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
-  projectContainer: {
-    padding: 20,
+  projectSection: {
+    marginHorizontal: 15,
+    marginBottom: 15,
+  },
+  projectHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  projectIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  projectTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1F2937',
   },
   projectCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 15,
+    padding: 18,
     borderWidth: 2,
     borderColor: '#EC4899',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  projectTitle: {
-    fontSize: 18,
+  projectCardTitle: {
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: 8,
   },
-  projectDescription: {
-    fontSize: 14,
+  projectCardDescription: {
+    fontSize: 13,
     color: '#6B7280',
-    marginBottom: 15,
-    lineHeight: 20,
+    lineHeight: 18,
+    marginBottom: 12,
   },
   projectMeta: {
     flexDirection: 'row',
-    gap: 20,
+    gap: 15,
     marginBottom: 15,
   },
   projectMetaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
   },
   projectMetaIcon: {
     fontSize: 14,
   },
   projectMetaText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#6B7280',
   },
-  requirementsTitle: {
-    fontSize: 15,
-    fontWeight: '600',
+  projectRequirementsTitle: {
+    fontSize: 13,
+    fontWeight: '700',
     color: '#1F2937',
-    marginTop: 10,
     marginBottom: 8,
   },
-  requirementItem: {
-    flexDirection: 'row',
-    marginBottom: 6,
-    paddingLeft: 5,
-  },
-  requirementBullet: {
-    fontSize: 14,
+  projectRequirement: {
+    fontSize: 12,
     color: '#6B7280',
-    marginRight: 8,
-  },
-  requirementText: {
-    fontSize: 13,
-    color: '#4B5563',
-    flex: 1,
     lineHeight: 18,
+    marginBottom: 4,
   },
-  detailsButton: {
+  projectButton: {
     marginTop: 15,
-    paddingVertical: 12,
-    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#5B52FF',
+    borderRadius: 10,
+    paddingVertical: 10,
     alignItems: 'center',
   },
-  detailsButtonText: {
+  projectButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#5B52FF',
   },
-  criteriaContainer: {
-    marginTop: 20,
+  criteriaSection: {
+    marginHorizontal: 15,
+    marginBottom: 30,
+  },
+  criteriaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  criteriaIcon: {
+    fontSize: 18,
+    marginRight: 8,
   },
   criteriaTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#1F2937',
-    marginBottom: 12,
   },
-  criterionItem: {
-    backgroundColor: '#F9FAFB',
-    padding: 12,
+  criteriaCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
+    padding: 15,
     marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  criterionHeader: {
+  criteriaItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 5,
   },
-  criterionTitle: {
+  criteriaItemTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1F2937',
-    flex: 1,
   },
-  criterionPoints: {
-    fontSize: 14,
+  criteriaItemPoints: {
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#EC4899',
   },
-  criterionDescription: {
+  criteriaItemDescription: {
     fontSize: 12,
     color: '#6B7280',
-    lineHeight: 16,
   },
 });
