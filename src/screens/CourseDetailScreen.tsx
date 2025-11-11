@@ -160,6 +160,11 @@ export default function CourseDetailScreen({ course, onBack }: CourseDetailScree
   const gradient = getCourseGradient();
   const groupedActivities = groupActivitiesByDay();
 
+  const totalWeeks = weeks.length;
+  const totalXP = weeks.reduce((sum, week) => {
+    return sum + activities.filter(a => a.week_id === week.id).reduce((s, a) => s + a.xp_reward, 0);
+  }, 0);
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -167,12 +172,56 @@ export default function CourseDetailScreen({ course, onBack }: CourseDetailScree
         style={styles.header}
       >
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
+          <Text style={styles.backButtonText}>← (tabs)</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{course.title}</Text>
+        <Text style={styles.headerSubtitle}>{course.title}</Text>
+
+        <View style={styles.headerIcon}>
+          <Text style={styles.headerIconText}>✂️</Text>
+        </View>
+
+        <Text style={styles.headerMainTitle}>{course.title}</Text>
+        <Text style={styles.headerDescription}>{course.description}</Text>
+
+        <View style={styles.headerBadges}>
+          <View style={styles.headerBadge}>
+            <Text style={styles.headerBadgeIcon}>📅</Text>
+            <Text style={styles.headerBadgeText}>{totalWeeks} semaines</Text>
+          </View>
+          <View style={styles.headerBadge}>
+            <Text style={styles.headerBadgeIcon}>⭐</Text>
+            <Text style={styles.headerBadgeText}>{totalXP} XP</Text>
+          </View>
+          <View style={styles.headerBadge}>
+            <Text style={styles.headerBadgeIcon}>📹</Text>
+            <Text style={styles.headerBadgeText}>Monteur Virtuose</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.startButton}>
+          <Text style={styles.startButtonText}>🚀 Démarrer le module</Text>
+        </TouchableOpacity>
       </LinearGradient>
 
       <ScrollView style={styles.content}>
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>📋 Informations</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoIcon}>📅</Text>
+            <Text style={styles.infoLabel}>Dates</Text>
+            <Text style={styles.infoValue}>01/01/2026 - 31/01/2026</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoIcon}>📊</Text>
+            <Text style={styles.infoLabel}>Niveau</Text>
+            <Text style={styles.infoBadge}>{course.difficulty === 'beginner' ? 'Débutant' : course.difficulty === 'intermediate' ? 'Intermédiaire' : 'Avancé'}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoIcon}>📚</Text>
+            <Text style={styles.infoLabel}>Semaines</Text>
+            <Text style={styles.infoValue}>{totalWeeks} semaines</Text>
+          </View>
+        </View>
         {weeks.length > 0 && (
           <View style={styles.weeksContainer}>
             <Text style={styles.sectionTitle}>🗓 Semaines</Text>
@@ -334,24 +383,135 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: 30,
     paddingHorizontal: 20,
+    alignItems: 'center',
   },
   backButton: {
+    alignSelf: 'flex-start',
     marginBottom: 10,
   },
   backButtonText: {
-    fontSize: 28,
+    fontSize: 14,
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  headerTitle: {
-    fontSize: 20,
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.9,
+    marginBottom: 20,
+  },
+  headerIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  headerIconText: {
+    fontSize: 40,
+  },
+  headerMainTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  headerDescription: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.9,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  headerBadges: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  headerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 15,
+    gap: 5,
+  },
+  headerBadgeIcon: {
+    fontSize: 14,
+  },
+  headerBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  startButton: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 14,
+    paddingHorizontal: 30,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  startButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#5B52FF',
   },
   content: {
     flex: 1,
+  },
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    margin: 20,
+    padding: 20,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 15,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  infoIcon: {
+    fontSize: 20,
+    width: 40,
+  },
+  infoLabel: {
+    flex: 1,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  infoValue: {
+    fontSize: 14,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  infoBadge: {
+    fontSize: 13,
+    color: '#5B52FF',
+    fontWeight: '600',
   },
   weeksContainer: {
     backgroundColor: '#FFFFFF',

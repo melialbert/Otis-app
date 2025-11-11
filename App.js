@@ -7,9 +7,9 @@ import { supabase } from './src/config/supabase';
 import { getCurrentUser, getUserProfile, createUserProfile } from './src/services/userService';
 
 import DashboardScreen from './src/screens/DashboardScreen';
-import ActivityScreen from './src/screens/ActivityScreen';
 import CoursesScreen from './src/screens/CoursesScreen';
-import QuizScreen from './src/screens/QuizScreen';
+import ProgressionScreen from './src/screens/ProgressionScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -152,15 +152,18 @@ export default function App() {
         <Tab.Navigator
           screenOptions={{
             headerShown: false,
-            tabBarActiveTintColor: '#4F46E5',
-            tabBarInactiveTintColor: '#6B7280',
+            tabBarActiveTintColor: '#5B52FF',
+            tabBarInactiveTintColor: '#9CA3AF',
             tabBarStyle: {
               paddingBottom: 8,
               paddingTop: 8,
-              height: 60,
+              height: 65,
+              backgroundColor: '#FFFFFF',
+              borderTopWidth: 1,
+              borderTopColor: '#E5E7EB',
             },
             tabBarLabelStyle: {
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: '600',
             },
           }}
@@ -169,39 +172,39 @@ export default function App() {
             name="Dashboard"
             component={DashboardScreen}
             options={{
-              tabBarLabel: 'Tableau de bord',
+              tabBarLabel: 'Dashboard',
               tabBarIcon: ({ color, size }) => (
-                <Text style={{ fontSize: size, color }}>📊</Text>
+                <Text style={{ fontSize: 24, color }}>🏠</Text>
               ),
             }}
           />
           <Tab.Screen
-            name="Activity"
-            component={ActivityScreen}
-            options={{
-              tabBarLabel: 'Activités',
-              tabBarIcon: ({ color, size }) => (
-                <Text style={{ fontSize: size, color }}>📅</Text>
-              ),
-            }}
-          />
-          <Tab.Screen
-            name="Courses"
+            name="Modules"
             component={CoursesScreen}
             options={{
-              tabBarLabel: 'Cours',
+              tabBarLabel: 'Modules',
               tabBarIcon: ({ color, size }) => (
-                <Text style={{ fontSize: size, color }}>📚</Text>
+                <Text style={{ fontSize: 24, color }}>📚</Text>
               ),
             }}
           />
           <Tab.Screen
-            name="Quiz"
-            component={QuizScreen}
+            name="Progression"
+            component={ProgressionScreen}
             options={{
-              tabBarLabel: 'Quiz',
+              tabBarLabel: 'Progression',
               tabBarIcon: ({ color, size }) => (
-                <Text style={{ fontSize: size, color }}>🎯</Text>
+                <Text style={{ fontSize: 24, color }}>📊</Text>
+              ),
+            }}
+          />
+          <Tab.Screen
+            name="Profil"
+            component={ProfileScreen}
+            options={{
+              tabBarLabel: 'Profil',
+              tabBarIcon: ({ color, size }) => (
+                <Text style={{ fontSize: 24, color }}>👤</Text>
               ),
             }}
           />
