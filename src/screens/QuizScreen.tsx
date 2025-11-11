@@ -122,7 +122,7 @@ export default function QuizScreen() {
       </View>
 
       <ScrollView style={styles.content}>
-        {quizzes.map((quiz) => (
+        {quizzes && quizzes.map((quiz) => (
           <TouchableOpacity
             key={quiz.id}
             style={styles.quizCard}
@@ -173,10 +173,10 @@ export default function QuizScreen() {
                   </View>
 
                   <ScrollView style={styles.questionContainer}>
-                    <Text style={styles.questionText}>{currentQuestion.question_text}</Text>
+                    <Text style={styles.questionText}>{currentQuestion?.question_text}</Text>
 
                     <View style={styles.optionsContainer}>
-                      {currentQuestion.options.map((option, index) => (
+                      {currentQuestion?.options?.map((option, index) => (
                         <TouchableOpacity
                           key={index}
                           style={[

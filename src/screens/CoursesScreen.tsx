@@ -112,6 +112,7 @@ export default function CoursesScreen() {
   };
 
   const getFilteredCourses = () => {
+    if (!courses || courses.length === 0) return [];
     if (activeFilter === 'all') return courses;
     return courses.filter(c => c.difficulty === activeFilter);
   };
@@ -295,7 +296,7 @@ export default function CoursesScreen() {
           <ScrollView style={styles.modalContent}>
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>📚 Contenu du module</Text>
-              {courseContent.map((content, index) => (
+              {courseContent && courseContent.map((content, index) => (
                 <View key={content.id} style={styles.contentBlock}>
                   <View style={styles.contentNumber}>
                     <Text style={styles.contentNumberText}>{index + 1}</Text>
