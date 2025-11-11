@@ -30,6 +30,27 @@ export async function getWeekActivities(weekId: string): Promise<CourseActivity[
   return data || [];
 }
 
+export async function getCourseActivities(courseId: string): Promise<CourseActivity[]> {
+  const { data: weeks } = await supabase
+    .from('course_weeks')
+    .select('id')
+    .eq('course_id', courseId);
+
+  if (!weeks || weeks.length === 0) return [];
+
+  const weekIds = weeks.map(w => w.id);
+
+  const { data, error } = await supabase
+    .from('course_activities')
+    .select('*')
+    .in('week_id', weekIds)
+    .order('day_number', { ascending: true })
+    .order('order_index', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
 export async function getCourseProject(courseId: string): Promise<CourseProject | null> {
   const { data, error } = await supabase
     .from('course_projects')
